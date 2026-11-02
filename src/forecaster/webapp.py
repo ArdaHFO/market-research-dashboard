@@ -295,6 +295,7 @@ class AnalysisState:
                 return False
             self.status = "running"
             self.progress = ""
+            self.results = []
             self.error = None
         threading.Thread(target=self._run, args=(symbols, user_id), daemon=True).start()
         return True
@@ -380,6 +381,8 @@ def create_app(cfg: Config) -> FastAPI:
         username = item.username.strip().lower()
         if not username or not item.password:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username and password are required")
+        if username == "default":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This username is reserved")
         if cfg.registration_code and item.invite_code != cfg.registration_code:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid registration code")
         recorder = _recorder()
@@ -984,7 +987,7 @@ tbody tr:hover td{background:rgba(255,255,255,.022)}
       <h1>TradeView <span class="tag">🌍 Türkiye · ABD · Avrupa · Asya — tüm dünya piyasaları</span></h1>
       <div class="sub">Haber + teknik analiz, yapay zekâ destekli yorumlama, favori listesi ve performans panosu.</div>
     </div>
-    <div class="badge"><span id="modelBadge" class="pill">AI Modeli: —</span><span id="status" class="pill">Boşta</span></div>
+    <div class="badge"><span id="modelBadge" class="pill">AI Modeli: —</span><span id="status" class="pill">Boşta</span><button id="sessionLogout" class="btn alt small" style="display:none" onclick="logoutUser()">Çıkış</button></div>
   </div>
 
     <div class="card panel" id="authCard">
@@ -998,6 +1001,7 @@ tbody tr:hover td{background:rgba(255,255,255,.022)}
         <div class="settings-grid" style="grid-template-columns:repeat(3,1fr)">
             <div class="field"><label>Kullanıcı adı</label><input id="auth_username" type="text" autocomplete="username"></div>
             <div class="field"><label>Şifre</label><input id="auth_password" type="password" autocomplete="current-password"></div>
+            <div class="field"><label>Davet kodu (isteniyorsa)</label><input id="auth_invite_code" type="text" autocomplete="off"></div>
             <div class="field"><label>&nbsp;</label><div class="row"><button class="btn good" onclick="registerUser()">Kaydol</button><button class="btn alt" onclick="loginUser()">Giriş Yap</button><button class="btn alt" onclick="logoutUser()">Çıkış</button></div></div>
         </div>
         <div id="auth_status" class="sub" style="margin-top:8px"></div>
@@ -1424,26 +1428,31 @@ function renderChips(){
   c.innerHTML = selected.map(s =>
     `<span class="chip" title="${esc(s.name || s.symbol)} · ${esc((s.news_sources||[]).join(', '))}">
       <span><b>${esc(s.symbol)}</b> <span class="muted" style="font-size:11px">${esc(s.timeframe)} · ${esc(s.profile)}</span></span>
-      <button aria-label="kaldır" onclick="remove('${esc(s.symbol)}')">×</button></span>`).join('');
+      <button aria-label="kaldır" onclick='remove(${esc(JSON.stringify(s.symbol))})' >×</button></span>`).join('');
 }
 
 async function postAnalyze(url, payload){
-  // Immediate feedback so it's obvious the click registered.
   document.getElementById('go').disabled = true;
   document.querySelectorAll('.analysis-btn').forEach(b => b.disabled = true);
   document.getElementById('progress').textContent = 'Başlatılıyor…';
-  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
-  if (!r.ok){
-    const err = await r.json().catch(() => ({}));
+  try {
+    const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+    if (!r.ok){
+      const err = await r.json().catch(() => ({}));
+      throw new Error(errDetail(err) || 'İşlem başlatılamadı.');
+    }
+    await r.json();
+    // started=false means another request already started a run; follow it.
+    showTab('analiz');
+    startPolling();
+    return true;
+  } catch (err) {
     document.getElementById('go').disabled = false;
     document.querySelectorAll('.analysis-btn').forEach(b => b.disabled = false);
     document.getElementById('progress').textContent = '';
-    alert(errDetail(err) || 'İşlem başlatılamadı.');
+    alert(err.message || 'İşlem başlatılamadı.');
     return false;
   }
-  const data = await r.json();
-  if (data.started){ showTab('analiz'); startPolling(); }
-  return true;
 }
 
 function selectedPayload(){
@@ -1565,7 +1574,7 @@ async function loadBrowseStocks(ex){
   let list = [];
   try { const r = await fetch('/api/stocks?exchange=' + encodeURIComponent(ex)); if (r.ok) list = await r.json(); } catch (e) {}
   if (!list.length){ box.innerHTML = '<span class="muted" style="font-size:12px">Liste alınamadı.</span>'; return; }
-  box.innerHTML = list.map(s => `<div class="stock-chip" onclick='pick(${JSON.stringify({symbol:s.symbol, name:s.name}).replace(/'/g, "&#39;")})'>
+  box.innerHTML = list.map(s => `<div class="stock-chip" onclick='pick(${esc(JSON.stringify({symbol:s.symbol, name:s.name}))})'>
     <span class="s">${esc(s.symbol)}</span><span class="n">${esc(s.name)}</span></div>`).join('');
 }
 
@@ -1596,7 +1605,9 @@ async function runScreener(){
   document.getElementById('scr_results').innerHTML = skeletonRows(8, 6);
   try {
     const r = await fetch(`/api/screener?universe=${encodeURIComponent(universe)}&timeframe=${encodeURIComponent(tf)}`);
-    screenerResults = await r.json();
+    if (!r.ok) throw new Error('Tarama başarısız.');
+    const data = await r.json();
+    screenerResults = Array.isArray(data) ? data : [];
   } catch (e) { screenerResults = []; }
   btn.disabled = false;
   const hasModel = screenerResults.some(r => r.model_proba != null);
@@ -1630,7 +1641,7 @@ function renderScreener(){
     <td>${modelCell(r)}</td>
     <td>${formatPrice(r.symbol, r.price)}</td>
     <td>${r.rsi == null ? '—' : r.rsi.toFixed(0)}</td>
-    <td><button class="btn alt small" onclick='analyzeFromScreener(${JSON.stringify({symbol:r.symbol, name:r.name}).replace(/'/g, "&#39;")})'>＋ Analiz</button></td>
+    <td><button class="btn alt small" onclick='analyzeFromScreener(${esc(JSON.stringify({symbol:r.symbol, name:r.name}))})'>＋ Analiz</button></td>
   </tr>`).join('');
 }
 
@@ -1725,7 +1736,7 @@ function renderHistory(){
   const f = historyFilterValue();
   const rows = historyRows.filter(p => f === 'all'
     || (f === 'hit' && p.hit === 1) || (f === 'miss' && p.hit === 0) || (f === 'pending' && p.hit === null));
-  document.getElementById('history').innerHTML = rows.length ? rows.map(p => `<tr class="row-clickable" onclick='openHistoryDetail(${JSON.stringify(p).replace(/'/g, "&#39;")})'>
+  document.getElementById('history').innerHTML = rows.length ? rows.map(p => `<tr class="row-clickable" onclick='openHistoryDetail(${esc(JSON.stringify(p))})'>
     <td>${new Date(p.ts).toLocaleString('tr-TR')}</td>
     <td><b>${esc(p.symbol)}</b></td>
     <td class="${dirClass(p.final_direction)}">${dirLabel(p.final_direction)}</td>
@@ -1744,8 +1755,8 @@ async function loadDashboard(){
   const d = await r.json();
   document.getElementById('statHit').textContent = d.hit_rate.total > 0 ? `${d.hit_rate.hits}/${d.hit_rate.total} (${pct(d.hit_rate.hits, d.hit_rate.total)})` : 'Veri yok';
   document.getElementById('statWatchlist').textContent = d.watchlist.length;
-  document.getElementById('statModel').textContent = d.by_profile[0] ? d.by_profile[0].profile : '-';
-  document.getElementById('statTf').textContent = d.by_timeframe[0] ? d.by_timeframe[0].timeframe : '-';
+  document.getElementById('statModel').textContent = d.recent[0] ? d.recent[0].profile : '-';
+  document.getElementById('statTf').textContent = d.recent[0] ? d.recent[0].timeframe : '-';
 
   // Cumulative hit-rate curve — with a soft gradient fill and a friendly empty
   // state so a fresh account (no resolved predictions yet) doesn't show a blank.
@@ -1789,9 +1800,9 @@ async function loadDashboard(){
       <td><b>${esc(w.symbol)}</b></td><td class="muted">${esc(w.name || '')}</td>
       <td class="muted">${esc(w.profiles || '')} / ${esc(w.timeframes || '')}</td>
       <td style="text-align:right;white-space:nowrap">
-        <button class="btn good small" onclick='analyzeWatchlistItem(${JSON.stringify(w).replace(/'/g,"&#39;")})'>▶ Analiz</button>
-        <button class="btn alt small" onclick='editWatchlist(${JSON.stringify(w).replace(/'/g,"&#39;")})'>Seç</button>
-        <button class="btn alt small" title="Favorilerden kaldır" onclick='removeWatchlistItem("${esc(w.symbol)}")'>🗑</button>
+        <button class="btn good small" onclick='analyzeWatchlistItem(${esc(JSON.stringify(w))})'>▶ Analiz</button>
+        <button class="btn alt small" onclick='editWatchlist(${esc(JSON.stringify(w))})'>Seç</button>
+        <button class="btn alt small" title="Favorilerden kaldır" onclick='removeWatchlistItem(${esc(JSON.stringify(w.symbol))})'>🗑</button>
       </td></tr>`).join('') : '<tr><td colspan="4" class="empty">Favori listesi boş — bir sembol seçip "Favorilere Ekle" butonuna basın.</td></tr>';
 
     // Per-symbol scorecard: hit-rate bars over the last 30 days.
@@ -2018,6 +2029,7 @@ async function showDetailFor(p, scroll){
   const panel = document.getElementById('detailPanel');
   panel.classList.remove('is-hidden');
   const token = ++detailToken;
+  lastChartSym = null;  // Do not switch the previous symbol while this detail loads.
 
   // Instant (no-fetch) parts render immediately.
   document.getElementById('detailTitle').textContent = `📊 ${p.symbol}${p.name ? ' — ' + p.name : ''}`;
@@ -2266,11 +2278,14 @@ function resizeLwCharts(){
 // analysis — a quick 1D/1W/1M/1h/30m switch is table-stakes for a trader.
 async function switchChartTimeframe(tf){
   if (!lastChartSym) return;
+  const sym = lastChartSym;
+  const token = ++detailToken;
   lastChartTf = tf;
   updateVwapAvailability();
-  const r = await fetch(`/api/chart?symbol=${encodeURIComponent(lastChartSym)}&timeframe=${encodeURIComponent(tf)}`);
+  const r = await fetch(`/api/chart?symbol=${encodeURIComponent(sym)}&timeframe=${encodeURIComponent(tf)}`);
   if (!r.ok) return;
   const chartData = await r.json();
+  if (token !== detailToken || sym !== lastChartSym) return;
   lastChartData = chartData;
   renderDetailChart();
   renderLevels(lastChartSym, chartData.summary || {});
@@ -2399,7 +2414,8 @@ async function loginUser(){
 }
 
 async function registerUser(){
-    const payload = {username: document.getElementById('auth_username').value, password: document.getElementById('auth_password').value};
+    const payload = {username: document.getElementById('auth_username').value, password: document.getElementById('auth_password').value,
+        invite_code: document.getElementById('auth_invite_code').value.trim() || null};
     const r = await fetch('/api/register', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
     if (!r.ok){
         const err = await r.json().catch(() => ({}));
@@ -2418,6 +2434,9 @@ async function logoutUser(){
     document.getElementById('authCard').style.display = 'block';
     document.getElementById('meStatus').textContent = 'oturum yok';
     document.getElementById('auth_status').textContent = 'Çıkış yapıldı.';
+    document.getElementById('sessionLogout').style.display = 'none';
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    ++detailToken;
 }
 
 async function loadMe(){
@@ -2436,6 +2455,7 @@ async function initializeForSession(){
     }
     document.getElementById('meStatus').textContent = `giriş: ${me.username}`;
     document.getElementById('authCard').style.display = 'none';
+    document.getElementById('sessionLogout').style.display = 'inline-block';
     document.getElementById('app_shell').style.display = 'block';
     renderChips();
     showTab('analiz');

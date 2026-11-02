@@ -40,7 +40,6 @@ CREATE TABLE IF NOT EXISTS predictions (
     actual_direction TEXT,
     hit INTEGER
 );
-CREATE INDEX IF NOT EXISTS idx_predictions_symbol_ts ON predictions(user_id, symbol, ts);
 
 CREATE TABLE IF NOT EXISTS user_watchlist (
     user_id INTEGER NOT NULL,
@@ -207,6 +206,11 @@ class PredictionRecorder:
             self._conn.executescript(_SQLITE_SCHEMA)
             self._conn.commit()
             self._ensure_user_columns()
+            self._conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_predictions_symbol_ts"
+                " ON predictions(user_id, symbol, ts)"
+            )
+            self._conn.commit()
         self._ensure_hitrate_v2_migration()
 
     def _ensure_schema_postgres(self) -> None:
@@ -327,6 +331,9 @@ class PredictionRecorder:
         return cur.fetchone()
 
     def authenticate_user(self, username: str, password: str) -> int | None:
+        # This account is reserved for CLI-owned records, never a web login.
+        if username.strip().lower() == "default":
+            return None
         user = self.get_user(username)
         if not user:
             return None
@@ -348,7 +355,9 @@ class PredictionRecorder:
     def get_session_user_id(self, token: str) -> int | None:
         self._use_dict_rows()
         cur = self._execute(
-            "SELECT user_id, expires_ts FROM sessions WHERE token = ?",
+            "SELECT sessions.user_id, sessions.expires_ts FROM sessions"
+            " JOIN users ON users.id = sessions.user_id"
+            " WHERE token = ? AND users.username <> 'default'",
             (token,),
         )
         row = cur.fetchone()
@@ -415,11 +424,11 @@ class PredictionRecorder:
 
     def _update_pending_prediction(self, prediction_id: int, p: Prediction) -> None:
         self._execute(
-            "UPDATE predictions SET ts = ?, news_score = ?, news_confidence = ?,"
+            "UPDATE predictions SET ts = ?, news_sources = ?, news_score = ?, news_confidence = ?,"
             " news_rationale = ?, technical_score = ?, technical_reasons_json = ?,"
             " final_score = ?, final_direction = ?, final_confidence = ?,"
             " price_at_prediction = ? WHERE id = ?",
-            (p.ts.isoformat(), p.news_score, p.news_confidence, p.news_rationale,
+            (p.ts.isoformat(), p.news_sources, p.news_score, p.news_confidence, p.news_rationale,
              p.technical_score, json.dumps(p.technical_reasons), p.final_score,
              p.final_direction.value, p.final_confidence, p.price_at_prediction, prediction_id),
         )
@@ -533,7 +542,7 @@ class PredictionRecorder:
         self._use_dict_rows()
         cur = self._execute(
             "SELECT ts, symbol, timeframe, profile, final_score, final_direction,"
-            " final_confidence, news_score, news_confidence, news_rationale,"
+            " final_confidence, news_sources, news_score, news_confidence, news_rationale,"
             " technical_score, price_at_prediction, actual_direction, hit FROM predictions"
             " WHERE user_id = ? ORDER BY id DESC LIMIT ?",
             (scoped_user_id, limit),
@@ -556,10 +565,10 @@ class PredictionRecorder:
         since_clause, since_params = self._since_clause(days)
         cur = self._execute(
             "SELECT profile, COUNT(*) AS total, COALESCE(SUM(hit), 0) AS hits,"
-            " ROUND(AVG(final_confidence), 3) AS avg_confidence,"
-            " ROUND(AVG(final_score), 3) AS avg_score"
+            " CAST(ROUND(CAST(AVG(final_confidence) AS NUMERIC), 3) AS DOUBLE PRECISION) AS avg_confidence,"
+            " CAST(ROUND(CAST(AVG(final_score) AS NUMERIC), 3) AS DOUBLE PRECISION) AS avg_score"
             " FROM predictions"
-            f" WHERE user_id = ? AND {since_clause}"
+            f" WHERE user_id = ? AND hit IS NOT NULL AND {since_clause}"
             " GROUP BY profile"
             " ORDER BY total DESC",
             (scoped_user_id, *since_params),
@@ -572,10 +581,10 @@ class PredictionRecorder:
         since_clause, since_params = self._since_clause(days)
         cur = self._execute(
             "SELECT timeframe, COUNT(*) AS total, COALESCE(SUM(hit), 0) AS hits,"
-            " ROUND(AVG(final_confidence), 3) AS avg_confidence,"
-            " ROUND(AVG(final_score), 3) AS avg_score"
+            " CAST(ROUND(CAST(AVG(final_confidence) AS NUMERIC), 3) AS DOUBLE PRECISION) AS avg_confidence,"
+            " CAST(ROUND(CAST(AVG(final_score) AS NUMERIC), 3) AS DOUBLE PRECISION) AS avg_score"
             " FROM predictions"
-            f" WHERE user_id = ? AND {since_clause}"
+            f" WHERE user_id = ? AND hit IS NOT NULL AND {since_clause}"
             " GROUP BY timeframe"
             " ORDER BY total DESC",
             (scoped_user_id, *since_params),
@@ -589,7 +598,7 @@ class PredictionRecorder:
         cur = self._execute(
             "SELECT final_direction, COUNT(*) AS total, COALESCE(SUM(hit), 0) AS hits"
             " FROM predictions"
-            f" WHERE user_id = ? AND {since_clause}"
+            f" WHERE user_id = ? AND hit IS NOT NULL AND {since_clause}"
             " GROUP BY final_direction"
             " ORDER BY total DESC",
             (scoped_user_id, *since_params),
@@ -602,10 +611,10 @@ class PredictionRecorder:
         since_clause, since_params = self._since_clause(days)
         cur = self._execute(
             "SELECT symbol, COUNT(*) AS total, COALESCE(SUM(hit), 0) AS hits,"
-            " ROUND(AVG(final_confidence), 3) AS avg_confidence,"
-            " ROUND(AVG(final_score), 3) AS avg_score"
+            " CAST(ROUND(CAST(AVG(final_confidence) AS NUMERIC), 3) AS DOUBLE PRECISION) AS avg_confidence,"
+            " CAST(ROUND(CAST(AVG(final_score) AS NUMERIC), 3) AS DOUBLE PRECISION) AS avg_score"
             " FROM predictions"
-            f" WHERE user_id = ? AND {since_clause}"
+            f" WHERE user_id = ? AND hit IS NOT NULL AND {since_clause}"
             " GROUP BY symbol"
             " ORDER BY total DESC, hits DESC"
             " LIMIT ?",

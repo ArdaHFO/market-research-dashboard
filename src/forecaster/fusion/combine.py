@@ -83,7 +83,7 @@ def combine(
         symbol=news.symbol,
         name=name,
         timeframe=timeframe,
-        profile=profile,
+        profile="balanced" if profile == "learned" and not use_learned else profile,
         news_sources=news_sources,
         news_score=news.score,
         news_confidence=news.confidence,

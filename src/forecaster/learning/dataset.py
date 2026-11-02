@@ -26,6 +26,8 @@ Dataset = dict[str, tuple[list[list[float]], list[int]]]
 
 def build_backtest_dataset(symbols: list[str], cfg: Config, timeframe: str = "1d",
                            horizon: int = 1, period: str = "10y") -> Dataset:
+    if horizon < 1:
+        raise ValueError("horizon must be a positive number of bars")
     # One index fetch per market, shared by every symbol trading under it.
     market_cache: dict[str, list] = {}
 

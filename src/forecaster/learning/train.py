@@ -73,6 +73,10 @@ def _selective_bands(yte: list[int], p_model: list[float]) -> list[dict]:
 def train_and_evaluate(symbols: list[str], cfg: Config, timeframe: str = "1d",
                        horizon: int = 60, test_frac: float = 0.3,
                        save_path: str | None = None) -> tuple[LogisticRegression | None, dict]:
+    if horizon < 1:
+        raise ValueError("horizon must be a positive number of bars")
+    if not 0.0 < test_frac < 1.0:
+        raise ValueError("test_frac must be between 0 and 1")
     dataset = build_backtest_dataset(symbols, cfg, timeframe, horizon=horizon)
     Xtr, ytr, Xval, yval, Xte, yte = _split(dataset, test_frac, embargo=horizon, val_frac=0.15)
     if len(Xtr) < 50 or len(Xte) < 20:

@@ -96,7 +96,13 @@ def run_for_symbols(symbols: list[dict], cfg: Config, progress_cb=None, user_id:
 
     report(f"fetching news + technicals for {len(symbols)} symbol(s)...")
     news_items = {_news_key(item): item for item in symbols}
-    tech_items = {_tech_key(item): item for item in symbols}
+    tech_items = {}
+    for item in symbols:
+        key = _tech_key(item)
+        # Shared technical data must include market features whenever any
+        # request for this symbol/timeframe uses the learned profile.
+        if key not in tech_items or str(item.get("profile")) == "learned":
+            tech_items[key] = item
     # Cap concurrency: an unbounded 2x-per-run pool risks Yahoo/Groq 429s
     # once a compare/multi-timeframe run fans out to dozens of symbols.
     max_workers = min(8, max(2, len(news_items) + len(tech_items)))

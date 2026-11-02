@@ -144,7 +144,10 @@ def _locale_for_symbol(symbol: str) -> tuple[str, str, str]:
 
 
 def _normalize_title(title: str) -> str:
-    return re.sub(r"[^a-z0-9 ]", "", title.lower()).strip()
+    # Preserve letters from every supported market, including Japanese and
+    # Korean; stripping to ASCII made unrelated headlines identical.
+    cleaned = "".join(ch for ch in title.casefold() if ch.isalnum() or ch.isspace())
+    return " ".join(cleaned.split())
 
 
 def _is_duplicate(title: str, seen: list[str], threshold: float) -> bool:

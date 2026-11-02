@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
@@ -156,7 +157,8 @@ def analyze_news(symbol: str, articles: list[NewsArticle], cfg: Config) -> NewsV
             rationale="NEWS_UNAVAILABLE (API error)", article_count=len(articles),
         )
 
-    content = getattr(response.choices[0].message, "content", "")
+    choices = getattr(response, "choices", None) or []
+    content = getattr(getattr(choices[0], "message", None), "content", "") if choices else ""
     if not content:
         log.warning("groq sentiment returned empty content for %s", symbol)
         return NewsVerdict(
@@ -178,8 +180,15 @@ def analyze_news(symbol: str, articles: list[NewsArticle], cfg: Config) -> NewsV
         )
 
     try:
-        score = max(-1.0, min(1.0, float(data["score"])))
-        confidence = max(0.0, min(1.0, float(data["confidence"])))
+        score = float(data["score"])
+        confidence = float(data["confidence"])
+        if not math.isfinite(score) or not math.isfinite(confidence):
+            raise ValueError("score and confidence must be finite")
+        score = max(-1.0, min(1.0, score))
+        confidence = max(0.0, min(1.0, confidence))
+        key_drivers = data.get("key_drivers") or []
+        if not isinstance(key_drivers, list):
+            raise TypeError("key_drivers must be a list")
     except (KeyError, ValueError, TypeError) as exc:
         log.warning("groq sentiment returned an unexpected shape for %s: %r (%s)", symbol, data, exc)
         return NewsVerdict(
@@ -194,7 +203,7 @@ def analyze_news(symbol: str, articles: list[NewsArticle], cfg: Config) -> NewsV
         direction=_direction_from_score(score),
         score=score,
         confidence=confidence,
-        key_drivers=list(data.get("key_drivers") or []),
+        key_drivers=[str(driver) for driver in key_drivers],
         rationale=str(data.get("rationale") or data.get("reasoning") or ""),
         article_count=len(articles),
     )

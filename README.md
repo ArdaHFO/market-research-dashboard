@@ -1,4 +1,6 @@
-<h1 align="center">TradeView</h1>
+Market Research Dashboard brings company news, price charts and recorded forecasts together for easier comparison.
+
+<h1 align="center">Market Research Dashboard</h1>
 
 <p align="center"><strong>Read the news. Inspect the chart. Compare the evidence.</strong></p>
 <p align="center">A Python market-research dashboard combining financial headlines, technical indicators and recorded directional forecasts.</p>
@@ -7,12 +9,12 @@
   <strong>English</strong> · <a href="README.tr.md">Türkçe</a><br />
   <a href="#run-locally"><strong>Run locally</strong></a> ·
   <a href="#inside-the-dashboard">Explore the workflow</a> ·
-  <a href="https://github.com/ArdaHFO/tradeview/issues">Report an issue</a>
+  <a href="https://github.com/ArdaHFO/market-research-dashboard/issues">Report an issue</a>
 </p>
 
 ---
 
-TradeView brings symbol search, headline analysis, interactive charts, watchlists and forecast history into one FastAPI application. Compare news-heavy and technical-heavy views, inspect different timeframes, and review recorded outcomes rather than treating a single score as a complete decision.
+Market Research Dashboard brings symbol search, headline analysis, interactive charts, watchlists and forecast history into one FastAPI application. Compare news-heavy and technical-heavy views, inspect different timeframes, and review recorded outcomes rather than treating a single score as a complete decision.
 
 **This is a research application with a Turkish interface.** It generates analytical outputs and records predictions. It does not contain a brokerage or exchange order-execution integration. English and Turkish documentation are provided.
 
@@ -30,8 +32,8 @@ TradeView brings symbol search, headline analysis, interactive charts, watchlist
 Create a fresh virtual environment. The repository currently contains a tracked `.venv` tree, which is not a portable development environment.
 
 ```bash
-git clone https://github.com/ArdaHFO/tradeview.git
-cd tradeview
+git clone https://github.com/ArdaHFO/market-research-dashboard.git
+cd market-research-dashboard
 python -m venv .venv-local
 ```
 
@@ -111,7 +113,7 @@ The repository includes pytest coverage for indicators, fusion, sentiment parsin
 python -m pytest -q
 ```
 
-These are the existing test sources, not a claim that they were rerun for this documentation update. No live market pipeline, model training, deployment or browser session was executed during the update. Dependencies are currently unpinned, so a new installation may differ from the original environment. External data coverage, rate limits and provider availability affect results.
+The 2 November 2026 source review corrected request-state handling, model fallback labels, multilingual headline deduplication, database compatibility, prediction provenance, resolved-only performance summaries and authentication/interface issues. Applications and tests were not run during this review, so the changes still require runtime validation. The existing test sources above are provided for that purpose. Dependencies are currently unpinned, so a new installation may differ from the original environment. External data coverage, rate limits and provider availability affect results.
 
 For a container-based launch, the supplied [`Dockerfile`](Dockerfile) installs the same requirements and runs `python main.py serve`. Configure persistence separately for SQLite or use PostgreSQL. A container definition alone does not establish a validated public deployment.
 
@@ -135,4 +137,4 @@ Include the affected symbol, timeframe, profile, expected behavior and sanitized
 
 ## License and credits
 
-No project-level license file is present. This documentation does not assign a new license. Python packages and browser chart libraries retain their own licenses, and data providers retain their own service terms. The project is independently named TradeView and is not presented as an official product of those providers.
+No project-level license file is present. This documentation does not assign a new license. Python packages and browser chart libraries retain their own licenses, and data providers retain their own service terms. The existing application interface is labelled TradeView. The project is not presented as an official product of those providers.

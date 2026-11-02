@@ -1,4 +1,6 @@
-<h1 align="center">TradeView</h1>
+Market Research Dashboard, şirket haberlerini, fiyat grafiklerini ve kayıtlı tahminleri kolay karşılaştırman için bir araya getirir.
+
+<h1 align="center">Market Research Dashboard</h1>
 
 <p align="center"><strong>Haberi oku. Grafiği incele. Kanıtları karşılaştır.</strong></p>
 <p align="center">Finans haberlerini, teknik göstergeleri ve kayıtlı yön tahminlerini birleştiren Python tabanlı bir piyasa araştırma paneli.</p>
@@ -7,12 +9,12 @@
   <a href="README.md">English</a> · <strong>Türkçe</strong><br />
   <a href="#yerel-çalıştırma"><strong>Yerel çalıştırma</strong></a> ·
   <a href="#panelin-içinde">Kullanım akışı</a> ·
-  <a href="https://github.com/ArdaHFO/tradeview/issues">Sorun bildir</a>
+  <a href="https://github.com/ArdaHFO/market-research-dashboard/issues">Sorun bildir</a>
 </p>
 
 ---
 
-TradeView sembol aramasını, haber analizini, etkileşimli grafikleri, favori listelerini ve tahmin geçmişini tek bir FastAPI uygulamasında toplar. Haber ve teknik ağırlıklı görüşleri karşılaştırabilir, farklı zaman dilimlerini inceleyebilir ve tek bir skoru kararın tamamı olarak görmek yerine kayıtlı sonuçları değerlendirebilirsin.
+Market Research Dashboard sembol aramasını, haber analizini, etkileşimli grafikleri, favori listelerini ve tahmin geçmişini tek bir FastAPI uygulamasında toplar. Haber ve teknik ağırlıklı görüşleri karşılaştırabilir, farklı zaman dilimlerini inceleyebilir ve tek bir skoru kararın tamamı olarak görmek yerine kayıtlı sonuçları değerlendirebilirsin.
 
 **Bu, arayüzü Türkçe olan bir araştırma uygulamasıdır.** Analiz çıktıları üretir ve tahminleri kaydeder. Aracı kuruma veya borsaya emir ileten bir entegrasyon içermez. İngilizce ve Türkçe dokümantasyon sunulur.
 
@@ -30,8 +32,8 @@ TradeView sembol aramasını, haber analizini, etkileşimli grafikleri, favori l
 Yeni bir sanal ortam oluştur. Repoda izlenen `.venv` ağacı taşınabilir bir geliştirme ortamı değildir.
 
 ```bash
-git clone https://github.com/ArdaHFO/tradeview.git
-cd tradeview
+git clone https://github.com/ArdaHFO/market-research-dashboard.git
+cd market-research-dashboard
 python -m venv .venv-local
 ```
 
@@ -111,7 +113,7 @@ Repodaki pytest dosyaları göstergeleri, skor birleştirmeyi, haber yanıtı ay
 python -m pytest -q
 ```
 
-Bunlar mevcut test kaynaklarıdır, bu dokümantasyon güncellemesinde yeniden çalıştırıldıkları iddia edilmez. Güncellemede canlı piyasa pipeline'ı, model eğitimi, dağıtım veya tarayıcı oturumu çalıştırılmadı. Bağımlılıklar sürüme sabitlenmediği için yeni kurulum özgün ortamdan farklı olabilir. Veri kapsamı, istek sınırları ve sağlayıcı erişimi sonuçları etkiler.
+2 Kasım 2026 kaynak incelemesinde istek durumu yönetimi, model kullanılamadığındaki profil etiketi, çok dilli haberlerin tekrar kontrolü, veritabanı uyumluluğu, tahmin kaynaklarının kaydı, yalnız sonuçlanmış tahminlerden hesaplanan performans özetleri ve kimlik doğrulama/arayüz sorunları düzeltildi. İnceleme sırasında uygulama ve testler çalıştırılmadı; değişikliklerin çalışma zamanı doğrulaması hâlâ gerekli. Yukarıdaki mevcut test kaynakları bunun için sunuluyor. Bağımlılıklar sürüme sabitlenmediği için yeni kurulum özgün ortamdan farklı olabilir. Veri kapsamı, istek sınırları ve sağlayıcı erişimi sonuçları etkiler.
 
 Konteyner kullanımı için sağlanan [`Dockerfile`](Dockerfile) aynı gereksinimleri kurar ve `python main.py serve` çalıştırır. SQLite için kalıcılığı ayrıca yapılandır veya PostgreSQL kullan. Konteyner tanımı tek başına doğrulanmış bir açık dağıtım anlamına gelmez.
 
@@ -135,4 +137,4 @@ Sorun bildirimine ilgili sembolü, zaman dilimini, profili, beklenen davranış�
 
 ## Lisans ve katkılar
 
-Proje düzeyinde lisans dosyası bulunmuyor. Bu dokümantasyon yeni bir lisans atamaz. Python paketleri ve tarayıcı grafik kütüphaneleri kendi lisanslarına, veri sağlayıcıları kendi hizmet koşullarına tabidir. Projenin adı bağımsız olarak TradeView'dır ve bu sağlayıcıların resmî ürünü olduğu iddia edilmez.
+Proje düzeyinde lisans dosyası bulunmuyor. Bu dokümantasyon yeni bir lisans atamaz. Python paketleri ve tarayıcı grafik kütüphaneleri kendi lisanslarına, veri sağlayıcıları kendi hizmet koşullarına tabidir. Mevcut uygulama arayüzünde TradeView adı kullanılır. Projenin bu sağlayıcıların resmî ürünü olduğu iddia edilmez.
